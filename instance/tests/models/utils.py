@@ -16,13 +16,19 @@ class S3Stubber(Stubber):
 
     def stub_create_bucket(self, bucket='test', location='test'):
         """ Stub helper for 'create_bucket' """
+        if not location or location == 'us-east-1':
+            expected_params = {
+                'Bucket': bucket
+            }
+        else:
+            expected_params = {
+                'Bucket': bucket, 'CreateBucketConfiguration': {
+                    'LocationConstraint': location
+                }
+            }
         self.add_response('create_bucket', {
             'Location': location
-        }, {
-            'Bucket': bucket, 'CreateBucketConfiguration': {
-                'LocationConstraint': location
-            }
-        })
+        }, expected_params)
 
     def stub_put_cors(self, bucket='test'):
         """ Stub helper for 'put_bucket_cors' """

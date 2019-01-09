@@ -304,18 +304,21 @@ class S3BucketInstanceMixin(models.Model):
         not specified, the value of the instance's 's3_region' field is used.
         """
         attempt, bucket = 1, None
-        location_constraint = location or self.s3_region
+        location_constraint = location or self.s3_region or None
         location_constraint = None if location_constraint == 'us-east-1' else location_constraint
         # oddly enough, boto3 uses 'us-east-1' as default and doesn't accept it explicitly
         # https://github.com/boto/boto3/issues/125
         while not bucket:
             try:
-                bucket = self.s3.create_bucket(
-                    Bucket=self.s3_bucket_name,
-                    CreateBucketConfiguration={
-                        'LocationConstraint': location_constraint
-                    },
-                )
+                if location_constraint is None:
+                    bucket = self.s3.create_bucket(Bucket=self.s3_bucket_name)
+                else:
+                    bucket = self.s3.create_bucket(
+                        Bucket=self.s3_bucket_name,
+                        CreateBucketConfiguration={
+                            'LocationConstraint': location_constraint
+                        },
+                    )
             except ClientError as e:
                 if e.response.get('Error', {}).get('Code') == 'EntityAlreadyExists':
                     break
