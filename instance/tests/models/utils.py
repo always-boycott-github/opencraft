@@ -44,7 +44,7 @@ class S3Stubber(Stubber):
             }
         })
 
-    def stub_set_expiration(self, bucket='test'):
+    def stub_set_expiration(self, bucket='test', days=30, prefix=''):
         """ Stub helper for 'put_bucket_lifecycle_configuration' """
         self.add_response('put_bucket_lifecycle_configuration', {}, {
             'Bucket': bucket,
@@ -52,8 +52,9 @@ class S3Stubber(Stubber):
                 'Rules': [
                     {
                         'NoncurrentVersionExpiration': {
-                            'NoncurrentDays': 30  # settings.S3_VERSION_EXPIRATION
+                            'NoncurrentDays': days
                         },
+                        'Prefix': prefix,
                         'Status': 'Enabled',
                     },
                 ]

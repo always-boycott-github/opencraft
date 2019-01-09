@@ -62,6 +62,7 @@ def get_s3_lifecycle():
                 'NoncurrentVersionExpiration': {
                     'NoncurrentDays': 30  # settings.S3_VERSION_EXPIRATION
                 },
+                'Prefix': '',
                 'Status': 'Enabled',
             },
         ]
