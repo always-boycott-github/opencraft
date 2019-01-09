@@ -261,9 +261,12 @@ class S3BucketInstanceMixin(models.Model):
         """
         Create connection to S3 service
         """
-        if self.s3_region:
-            return boto3.client('iam', self.s3_region)
-        return boto3.client('iam')
+        return boto3.client(
+            service_name='iam',
+            region_name=self.s3_region or None,
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+        )
 
     def create_iam_user(self):
         """
@@ -272,13 +275,10 @@ class S3BucketInstanceMixin(models.Model):
         self.iam.create_user(
             UserName=self.iam_username,
         )
-        policy = self.iam.create_policy(
-            PolicyName=USER_POLICY_NAME,
-            PolicyDocument=json.dumps(self.get_s3_policy()),
-        )['Policy']
-        self.iam.attach_user_policy(
+        self.iam.put_user_policy(
             UserName=self.iam_username,
-            PolicyArn=policy['Arn']
+            PolicyName=USER_POLICY_NAME,
+            PolicyDocument=json.dumps(self.get_s3_policy())
         )
         access_key = self.iam.create_access_key(UserName=self.iam_username)['AccessKey']
         self.s3_access_key = access_key['AccessKeyId']
@@ -290,15 +290,12 @@ class S3BucketInstanceMixin(models.Model):
         """
         Create connection to S3 service
         """
-        if self.s3_region:
-            return boto3.client(
-                's3', self.s3_region,
-                aws_access_key_id=self.s3_access_key,
-                aws_secret_access_key=self.s3_secret_access_key)
         return boto3.client(
-            's3',
-            aws_access_key_id=self.s3_access_key,
-            aws_secret_access_key=self.s3_secret_access_key)
+            service_name='s3',
+            region_name=self.s3_region or None,
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+        )
 
     def _create_bucket(self, max_tries=4, retry_delay=4, location=None):
         """

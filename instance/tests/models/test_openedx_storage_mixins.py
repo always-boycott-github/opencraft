@@ -384,10 +384,10 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
                     with IAMStubber(iam) as iamstubber:
                         if provision_iam:
                             iamstubber.stub_create_user(instance.iam_username)
-                            iamstubber.stub_create_policy(storage.USER_POLICY_NAME, instance.get_s3_policy())
-                            iamstubber.stub_attach_user_policy(
+                            iamstubber.stub_put_user_policy(
                                 instance.iam_username,
-                                '{}:{}'.format(storage.USER_POLICY_NAME, storage.USER_POLICY_NAME)
+                                storage.USER_POLICY_NAME,
+                                instance.get_s3_policy()
                             )
                             iamstubber.stub_create_access_key(instance.iam_username)
                         stubber.stub_create_bucket()
@@ -592,10 +592,10 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
                 with S3Stubber(s3) as stubber:
                     with IAMStubber(iam) as iamstubber:
                         iamstubber.stub_create_user(instance.iam_username)
-                        iamstubber.stub_create_policy(storage.USER_POLICY_NAME, instance.get_s3_policy())
-                        iamstubber.stub_attach_user_policy(
+                        iamstubber.stub_put_user_policy(
                             instance.iam_username,
-                            '{}:{}'.format(storage.USER_POLICY_NAME, storage.USER_POLICY_NAME)
+                            storage.USER_POLICY_NAME,
+                            instance.get_s3_policy()
                         )
                         iamstubber.stub_create_access_key(instance.iam_username)
                         stubber.stub_create_bucket(bucket=instance.s3_bucket_name, location='')
@@ -622,10 +622,11 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         with patch('instance.models.mixins.storage.S3BucketInstanceMixin.iam', iam):
             with IAMStubber(iam) as iamstubber:
                 iamstubber.stub_create_user(instance.iam_username)
-                iamstubber.stub_create_policy(storage.USER_POLICY_NAME, instance.get_s3_policy())
-                iamstubber.stub_attach_user_policy(instance.iam_username, '{}:{}'.format(
-                    storage.USER_POLICY_NAME, storage.USER_POLICY_NAME
-                ))
+                iamstubber.stub_put_user_policy(
+                    instance.iam_username,
+                    storage.USER_POLICY_NAME,
+                    instance.get_s3_policy()
+                )
                 iamstubber.stub_create_access_key(instance.iam_username)
                 instance.create_iam_user()
                 instance.refresh_from_db()

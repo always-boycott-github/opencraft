@@ -109,22 +109,12 @@ class IAMStubber(Stubber):
             'UserName': username
         })
 
-    def stub_create_policy(self, policy_name, policy_document):
-        """ Stub helper for 'create_policy' """
-        self.add_response('create_policy', {
-            'Policy': {
-                'Arn': '{}:{}'.format(policy_name, policy_name)
-            }
-        }, {
+    def stub_put_user_policy(self, username, policy_name, policy_document):
+        """ Stub helper for 'put_user_policy' """
+        self.add_response('put_user_policy', {}, {
+            'UserName': username,
             'PolicyName': policy_name,
             'PolicyDocument': json.dumps(policy_document)
-        })
-
-    def stub_attach_user_policy(self, username, policy_arn):
-        """ Stub helper for 'attach_user_policy' """
-        self.add_response('attach_user_policy', {}, {
-            'UserName': username,
-            'PolicyArn': policy_arn
         })
 
     def stub_create_access_key(self, username, access_key='test_0123456789a', secret='secret'):
