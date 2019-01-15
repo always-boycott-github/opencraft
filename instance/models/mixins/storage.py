@@ -35,38 +35,28 @@ from swiftclient.exceptions import ClientException as SwiftClientException
 from instance import openstack_utils
 from instance.models.utils import default_setting
 
-USER_POLICY_NAME = 'allow_access_s3_bucket'
-
-
-def get_s3_cors_config():
-    """
-    Default CORS config for ORA2 File uploads
-    """
-    return {
-        'CORSRules': [{
-            'AllowedHeaders': ['*'],
-            'AllowedMethods': ['GET', 'PUT'],
-            'AllowedOrigins': ['*'],
-            'ExposeHeaders': ['GET', 'PUT'],
-        }]
-    }
-
-
-def get_s3_lifecycle():
-    """
-    Default bucket lifecycle for expiring old versions of objects
-    """
-    return {
-        'Rules': [
-            {
-                'NoncurrentVersionExpiration': {
-                    'NoncurrentDays': 30  # settings.S3_VERSION_EXPIRATION
-                },
-                'Prefix': '',
-                'Status': 'Enabled',
+S3_LIFECYCLE = {
+    'Rules': [
+        {
+            'NoncurrentVersionExpiration': {
+                'NoncurrentDays': settings.S3_VERSION_EXPIRATION
             },
-        ]
-    }
+            'Prefix': '',
+            'Status': 'Enabled',
+        },
+    ]
+}
+
+S3_CORS = {
+    'CORSRules': [{
+        'AllowedHeaders': ['*'],
+        'AllowedMethods': ['GET', 'PUT'],
+        'AllowedOrigins': ['*'],
+        'ExposeHeaders': ['GET', 'PUT'],
+    }]
+}
+
+USER_POLICY_NAME = 'allow_access_s3_bucket'
 
 
 # Classes #####################################################################
@@ -190,6 +180,11 @@ class S3BucketInstanceMixin(models.Model):
         )
     )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._iam_client = None
+        self._s3_client = None
+
     def get_s3_policy(self):
         """
         Return s3 policy with access to create and update bucket
@@ -262,12 +257,14 @@ class S3BucketInstanceMixin(models.Model):
         """
         Create connection to S3 service
         """
-        return boto3.client(
-            service_name='iam',
-            region_name=self.s3_region or None,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
-        )
+        if self._iam_client is None:
+            self._iam_client = boto3.client(
+                service_name='iam',
+                region_name=self.s3_region or None,
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+            )
+        return self._iam_client
 
     def create_iam_user(self):
         """
@@ -291,12 +288,14 @@ class S3BucketInstanceMixin(models.Model):
         """
         Create connection to S3 service
         """
-        return boto3.client(
-            service_name='s3',
-            region_name=self.s3_region or None,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
-        )
+        if self._s3_client is None:
+            self._s3_client = boto3.client(
+                service_name='s3',
+                region_name=self.s3_region or None,
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+            )
+        return self._s3_client
 
     def _create_bucket(self, max_tries=4, retry_delay=4, location=None):
         """
@@ -306,12 +305,11 @@ class S3BucketInstanceMixin(models.Model):
         """
         attempt, bucket = 1, None
         location_constraint = location or self.s3_region or None
-        location_constraint = None if location_constraint == 'us-east-1' else location_constraint
-        # oddly enough, boto3 uses 'us-east-1' as default and doesn't accept it explicitly
-        # https://github.com/boto/boto3/issues/125
         while not bucket:
             try:
-                if location_constraint is None:
+                if location_constraint in (None, 'us-east-1'):
+                    # oddly enough, boto3 uses 'us-east-1' as default and doesn't accept it explicitly
+                    # https://github.com/boto/boto3/issues/125
                     bucket = self.s3.create_bucket(Bucket=self.s3_bucket_name)
                 else:
                     bucket = self.s3.create_bucket(
@@ -322,6 +320,10 @@ class S3BucketInstanceMixin(models.Model):
                     )
             except ClientError as e:
                 if e.response.get('Error', {}).get('Code') == 'EntityAlreadyExists':
+                    self.logger.info(
+                        'Bucket %s already exists',
+                        self.s3_bucket_name
+                    )
                     break
                 self.logger.info(
                     'Retrying bucket creation. IAM keys are not propagated yet, attempt %s of %s.',
@@ -335,13 +337,13 @@ class S3BucketInstanceMixin(models.Model):
         # Set bucket cors
         self.s3.put_bucket_cors(
             Bucket=self.s3_bucket_name,
-            CORSConfiguration=get_s3_cors_config()
+            CORSConfiguration=S3_CORS
         )
 
         # Enable bucket lifecycle
         self.s3.put_bucket_lifecycle_configuration(
             Bucket=self.s3_bucket_name,
-            LifecycleConfiguration=get_s3_lifecycle()
+            LifecycleConfiguration=S3_LIFECYCLE
         )
 
         # Enable bucket versioning
@@ -391,14 +393,16 @@ class S3BucketInstanceMixin(models.Model):
                 )
             # Remove bucket
             self.s3.delete_bucket(Bucket=self.s3_bucket_name)
-            self.s3_bucket_name = ""
-            self.save()
         except ClientError as e:
             if e.response['Error']['Code'] != '404':
                 self.logger.exception(
                     'There was an error trying to remove S3 bucket "%s".',
                     self.s3_bucket_name
                 )
+        else:
+            self.s3_bucket_name = ""
+            self.save()
+
         try:
             # Access keys and policies need to be deleted before removing the user
             self.iam.delete_access_key(UserName=self.iam_username, AccessKeyId=self.s3_access_key)
