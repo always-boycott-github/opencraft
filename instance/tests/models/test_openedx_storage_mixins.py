@@ -41,8 +41,8 @@ from instance.tests.models.utils import S3Stubber, IAMStubber
 
 
 # Clients #####################################################################
-iam = get_session().create_client('iam')
-s3 = get_session().create_client('s3')
+iam_client = get_session().create_client('iam')
+s3_client = get_session().create_client('s3')
 
 # Tests #######################################################################
 
@@ -367,8 +367,8 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
     @ddt.data(
         (True, ), (False, )
     )
-    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.iam', iam)
-    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.s3', s3)
+    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.iam', iam_client)
+    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.s3', s3_client)
     # pylint: disable=no-self-use
     def test_provision_s3(self, provision_iam):
         """
@@ -382,7 +382,7 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
             instance.s3_access_key = 'test'
             instance.s3_secret_access_key = 'test'
 
-        with S3Stubber(s3) as stubber, IAMStubber(iam) as iamstubber:
+        with S3Stubber(s3_client) as stubber, IAMStubber(iam_client) as iamstubber:
             if provision_iam:
                 iamstubber.stub_create_user(instance.iam_username)
                 iamstubber.stub_put_user_policy(
@@ -397,7 +397,7 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
                 stubber.stub_versioning()
                 instance.provision_s3()
 
-    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.s3', s3)
+    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.s3', s3_client)
     def test__create_bucket_fails(self):
         """
         Test s3 provisioning fails on bucket creation, and retries up to 4 times
@@ -407,7 +407,7 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         instance.s3_secret_access_key = 'test'
         instance.s3_bucket_name = 'test'
         max_tries = 4
-        stubber = Stubber(s3)
+        stubber = Stubber(s3_client)
         for _ in range(max_tries):
             stubber.add_client_error('create_bucket')
         with self.assertLogs('instance.models.instance', level='INFO') as cm:
@@ -425,8 +425,8 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
                 [base_log_text % i for i in range(1, max_tries + 1)]
             )
 
-    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.iam', iam)
-    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.s3', s3)
+    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.iam', iam_client)
+    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.s3', s3_client)
     def test_deprovision_s3(self):
         """
         Test s3 deprovisioning succeeds
@@ -439,7 +439,7 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         instance.s3_bucket_name = 'test'
         instance.s3_region = 'test'
 
-        with S3Stubber(s3) as stubber, IAMStubber(iam) as iamstubber:
+        with S3Stubber(s3_client) as stubber, IAMStubber(iam_client) as iamstubber:
             stubber.stub_create_bucket()
             stubber.stub_put_cors()
             stubber.stub_set_expiration()
@@ -447,16 +447,16 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
             instance.provision_s3()
             # Put an object
             stubber.stub_put_object(b'test', 'test')
-            s3.put_object(Body=b'test', Bucket='test', Key='test')
+            s3_client.put_object(Body=b'test', Bucket='test', Key='test')
             # Overwrite object
             stubber.stub_put_object(b'another_test', 'test')
-            s3.put_object(Body=b'another_test', Bucket='test', Key='test')
+            s3_client.put_object(Body=b'another_test', Bucket='test', Key='test')
             # Put another object
             stubber.stub_put_object(b'another_test', 'another_test')
-            s3.put_object(Body=b'another_test', Bucket='test', Key='another_test')
+            s3_client.put_object(Body=b'another_test', Bucket='test', Key='another_test')
             # Delete object
             stubber.stub_delete_object(key='another_test')
-            s3.delete_object(Bucket='test', Key='another_test')
+            s3_client.delete_object(Bucket='test', Key='another_test')
             # Make sure three versions and a delete marker are removed
             items = {
                 'Versions': [
@@ -491,8 +491,8 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         # We always want to preserve information about a client's preferred region, so s3_region should not be empty.
         self.assertEqual(instance.s3_region, "test")
 
-    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.s3', s3)
-    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.iam', iam)
+    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.s3', s3_client)
+    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.iam', iam_client)
     def test_deprovision_s3_delete_user_fails(self):
         """
         Test s3 deprovisioning fails on delete_user
@@ -503,7 +503,7 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         instance.s3_secret_access_key = 'test'
         instance.s3_bucket_name = 'test'
         with self.assertLogs("instance.models.instance"):
-            with S3Stubber(s3) as stubber, IAMStubber(iam) as iamstubber:
+            with S3Stubber(s3_client) as stubber, IAMStubber(iam_client) as iamstubber:
                 stubber.stub_create_bucket(location='')
                 stubber.stub_put_cors()
                 stubber.stub_set_expiration()
@@ -522,8 +522,8 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         self.assertEqual(instance.s3_access_key, "test_0123456789a")
         self.assertEqual(instance.s3_secret_access_key, "test")
 
-    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.iam', iam)
-    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.s3', s3)
+    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.iam', iam_client)
+    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.s3', s3_client)
     def test_deprovision_s3_delete_bucket_fails(self):
         """
         Test s3 deprovisioning fails on delete_bucket
@@ -535,7 +535,7 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         instance.s3_bucket_name = 'test'
         instance.s3_region = 'test'
         with self.assertLogs("instance.models.instance"):
-            with S3Stubber(s3) as stubber, IAMStubber(iam) as iamstubber:
+            with S3Stubber(s3_client) as stubber, IAMStubber(iam_client) as iamstubber:
                 stubber.stub_create_bucket()
                 stubber.stub_put_cors()
                 stubber.stub_set_expiration()
@@ -571,8 +571,8 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         self.assertEqual(instance.s3_secret_access_key, '')
         self.assertEqual(instance.s3_region, settings.AWS_S3_DEFAULT_REGION)
 
-    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.iam', iam)
-    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.s3', s3)
+    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.iam', iam_client)
+    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.s3', s3_client)
     def test_provision_s3_unconfigured(self):
         """
         Test s3 provisioning works with default bucket and IAM
@@ -580,7 +580,7 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         instance = OpenEdXInstanceFactory()
         instance.storage_type = StorageContainer.S3_STORAGE
         instance.s3_bucket_name = instance.bucket_name  # For stubbing to work correctly
-        with S3Stubber(s3) as stubber, IAMStubber(iam) as iamstubber:
+        with S3Stubber(s3_client) as stubber, IAMStubber(iam_client) as iamstubber:
             iamstubber.stub_create_user(instance.iam_username)
             iamstubber.stub_put_user_policy(
                 instance.iam_username,
@@ -601,7 +601,7 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         self.assertEqual(instance.s3_hostname, settings.AWS_S3_DEFAULT_HOSTNAME)
 
     @override_settings(AWS_ACCESS_KEY_ID='test_0123456789a', AWS_SECRET_ACCESS_KEY='secret')
-    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.iam', iam)
+    @patch('instance.models.mixins.storage.S3BucketInstanceMixin.iam', iam_client)
     def test_create_iam_user(self):
         """
         Test create_iam_user succeeds and sets the required attributes
@@ -609,7 +609,7 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         instance = OpenEdXInstanceFactory()
         instance.storage_type = StorageContainer.S3_STORAGE
 
-        with IAMStubber(iam) as iamstubber:
+        with IAMStubber(iam_client) as iamstubber:
             iamstubber.stub_create_user(instance.iam_username)
             iamstubber.stub_put_user_policy(
                 instance.iam_username,
