@@ -370,6 +370,9 @@ class S3BucketInstanceMixin(models.Model):
         self._create_bucket(location=self.s3_region)
 
     def _get_bucket_objects(self):
+        """
+        Get list of objects in bucket for deletion
+        """
         response = self.s3.list_object_versions(Bucket=self.s3_bucket_name)
         return response.get('Versions', []) + response.get('DeleteMarkers', [])
 
