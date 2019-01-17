@@ -304,10 +304,10 @@ class S3BucketInstanceMixin(models.Model):
         not specified, the value of the instance's 's3_region' field is used.
         """
         attempt, bucket = 1, None
-        location_constraint = location or self.s3_region or None
+        location_constraint = location or self.s3_region
         while not bucket:
             try:
-                if location_constraint in (None, 'us-east-1'):
+                if not location_constraint or location_constraint == 'us-east-1':
                     # oddly enough, boto3 uses 'us-east-1' as default and doesn't accept it explicitly
                     # https://github.com/boto/boto3/issues/125
                     bucket = self.s3.create_bucket(Bucket=self.s3_bucket_name)
@@ -369,6 +369,10 @@ class S3BucketInstanceMixin(models.Model):
 
         self._create_bucket(location=self.s3_region)
 
+    def _get_bucket_objects(self):
+        response = self.s3.list_object_versions(Bucket=self.s3_bucket_name)
+        return response.get('Versions', []) + response.get('DeleteMarkers', [])
+
     def deprovision_s3(self):
         """
         Deprovision S3 by deleting S3 bucket and IAM user
@@ -379,18 +383,15 @@ class S3BucketInstanceMixin(models.Model):
             return
 
         try:
-            while True:
-                # Delete object versions and delete markers
-                response = self.s3.list_object_versions(Bucket=self.s3_bucket_name)
-                to_delete = response.get('Versions', []) + response.get('DeleteMarkers', [])
-                if not to_delete:
-                    break
+            to_delete = self._get_bucket_objects()
+            while to_delete:
                 self.s3.delete_objects(
                     Bucket=self.s3_bucket_name,
                     Delete={
                         'Objects': [{'Key': d['Key'], 'VersionId': d['VersionId']} for d in to_delete]
                     }
                 )
+                to_delete = self._get_bucket_objects()
             # Remove bucket
             self.s3.delete_bucket(Bucket=self.s3_bucket_name)
         except ClientError as e:
