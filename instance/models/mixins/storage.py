@@ -195,14 +195,14 @@ class S3BucketInstanceMixin(models.Model):
                 {
                     "Effect": "Allow",
                     "Action": [
-                        "s3:ListBucket",
                         "s3:CreateBucket",
                         "s3:DeleteBucket",
                         "s3:DeleteObjects",
                         "s3:GetBucketCORS",
                         "s3:GetBucketVersioning",
                         "s3:GetLifecycleConfiguration",
-                        "s3:ListObjectVersions",
+                        "s3:ListBucket",
+                        "s3:ListBucketVersions",
                         "s3:PutBucketCORS",
                         "s3:PutBucketVersioning",
                         "s3:PutLifecycleConfiguration",
