@@ -198,6 +198,11 @@ class S3BucketInstanceMixin(models.Model):
                         "s3:ListBucket",
                         "s3:CreateBucket",
                         "s3:DeleteBucket",
+                        "s3:DeleteObjects",
+                        "s3:GetBucketCORS",
+                        "s3:GetBucketVersioning",
+                        "s3:GetLifecycleConfiguration",
+                        "s3:ListObjectVersions",
                         "s3:PutBucketCORS",
                         "s3:PutBucketVersioning",
                         "s3:PutLifecycleConfiguration",
@@ -292,8 +297,8 @@ class S3BucketInstanceMixin(models.Model):
             self._s3_client = boto3.client(
                 service_name='s3',
                 region_name=self.s3_region or None,
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+                aws_access_key_id=self.s3_access_key,
+                aws_secret_access_key=self.s3_secret_access_key
             )
         return self._s3_client
 
