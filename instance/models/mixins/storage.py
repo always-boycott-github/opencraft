@@ -278,11 +278,6 @@ class S3BucketInstanceMixin(models.Model):
         self.iam.create_user(
             UserName=self.iam_username,
         )
-        self.iam.put_user_policy(
-            UserName=self.iam_username,
-            PolicyName=USER_POLICY_NAME,
-            PolicyDocument=json.dumps(self.get_s3_policy())
-        )
         access_key = self.iam.create_access_key(UserName=self.iam_username)['AccessKey']
         self.s3_access_key = access_key['AccessKeyId']
         self.s3_secret_access_key = access_key['SecretAccessKey']
@@ -359,6 +354,13 @@ class S3BucketInstanceMixin(models.Model):
             }
         )
 
+    def _update_iam_policy(self):
+        self.iam.put_user_policy(
+            UserName=self.iam_username,
+            PolicyName=USER_POLICY_NAME,
+            PolicyDocument=json.dumps(self.get_s3_policy())
+        )
+
     def provision_s3(self):
         """
         Create S3 Bucket if it doesn't exist
@@ -372,6 +374,7 @@ class S3BucketInstanceMixin(models.Model):
         if not self.s3_access_key and not self.s3_secret_access_key:
             self.create_iam_user()
 
+        self._update_iam_policy()
         self._create_bucket(location=self.s3_region)
 
     def _get_bucket_objects(self):
