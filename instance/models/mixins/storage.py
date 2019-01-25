@@ -360,6 +360,7 @@ class S3BucketInstanceMixin(models.Model):
             PolicyName=USER_POLICY_NAME,
             PolicyDocument=json.dumps(self.get_s3_policy())
         )
+        self._s3_client = None
 
     def provision_s3(self):
         """
