@@ -385,12 +385,12 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         with S3Stubber(s3_client) as stubber, IAMStubber(iam_client) as iamstubber:
             if provision_iam:
                 iamstubber.stub_create_user(instance.iam_username)
+                iamstubber.stub_create_access_key(instance.iam_username)
                 iamstubber.stub_put_user_policy(
                     instance.iam_username,
                     storage.USER_POLICY_NAME,
                     instance.get_s3_policy()
                 )
-                iamstubber.stub_create_access_key(instance.iam_username)
                 stubber.stub_create_bucket()
                 stubber.stub_put_cors()
                 stubber.stub_set_expiration()
@@ -440,6 +440,11 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         instance.s3_region = 'test'
 
         with S3Stubber(s3_client) as stubber, IAMStubber(iam_client) as iamstubber:
+            iamstubber.stub_put_user_policy(
+                instance.iam_username,
+                storage.USER_POLICY_NAME,
+                instance.get_s3_policy()
+            )
             stubber.stub_create_bucket()
             stubber.stub_put_cors()
             stubber.stub_set_expiration()
@@ -504,6 +509,11 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         instance.s3_bucket_name = 'test'
         with self.assertLogs("instance.models.instance"):
             with S3Stubber(s3_client) as stubber, IAMStubber(iam_client) as iamstubber:
+                iamstubber.stub_put_user_policy(
+                    instance.iam_username,
+                    storage.USER_POLICY_NAME,
+                    instance.get_s3_policy()
+                )
                 stubber.stub_create_bucket(location='')
                 stubber.stub_put_cors()
                 stubber.stub_set_expiration()
@@ -536,6 +546,11 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         instance.s3_region = 'test'
         with self.assertLogs("instance.models.instance"):
             with S3Stubber(s3_client) as stubber, IAMStubber(iam_client) as iamstubber:
+                iamstubber.stub_put_user_policy(
+                    instance.iam_username,
+                    storage.USER_POLICY_NAME,
+                    instance.get_s3_policy()
+                )
                 stubber.stub_create_bucket()
                 stubber.stub_put_cors()
                 stubber.stub_set_expiration()
@@ -582,12 +597,12 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
         instance.s3_bucket_name = instance.bucket_name  # For stubbing to work correctly
         with S3Stubber(s3_client) as stubber, IAMStubber(iam_client) as iamstubber:
             iamstubber.stub_create_user(instance.iam_username)
+            iamstubber.stub_create_access_key(instance.iam_username)
             iamstubber.stub_put_user_policy(
                 instance.iam_username,
                 storage.USER_POLICY_NAME,
                 instance.get_s3_policy()
             )
-            iamstubber.stub_create_access_key(instance.iam_username)
             stubber.stub_create_bucket(bucket=instance.s3_bucket_name, location='')
             stubber.stub_put_cors(bucket=instance.s3_bucket_name)
             stubber.stub_set_expiration(bucket=instance.s3_bucket_name)
@@ -611,12 +626,12 @@ class S3ContainerInstanceTestCase(ContainerTestCase):
 
         with IAMStubber(iam_client) as iamstubber:
             iamstubber.stub_create_user(instance.iam_username)
+            iamstubber.stub_create_access_key(instance.iam_username)
             iamstubber.stub_put_user_policy(
                 instance.iam_username,
                 storage.USER_POLICY_NAME,
                 instance.get_s3_policy()
             )
-            iamstubber.stub_create_access_key(instance.iam_username)
             instance.create_iam_user()
             instance.refresh_from_db()
             self.assertEqual(instance.s3_access_key, 'test_0123456789a')
