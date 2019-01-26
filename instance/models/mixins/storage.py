@@ -355,6 +355,9 @@ class S3BucketInstanceMixin(models.Model):
         )
 
     def _update_iam_policy(self):
+        """
+        Update S3 IAM user policy
+        """
         self.iam.put_user_policy(
             UserName=self.iam_username,
             PolicyName=USER_POLICY_NAME,
